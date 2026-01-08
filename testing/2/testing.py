@@ -1,5 +1,5 @@
 import numpy as np
-a = np.array([[1,2,3],[4,5,6]])
-b = np.array([[7,8,9],[10,11,12]])
-c = np.concatenate((a,b),axis=1)
-print(c)
+a = np.full((16,1),0)
+print(a)
+b = np.full((16,8),1)
+print(np.concatenate((a,b),axis=1))

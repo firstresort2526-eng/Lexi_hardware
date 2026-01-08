@@ -6,8 +6,16 @@ from pathlib import Path
 # Display size constants
 COL = 360
 ROW = 360
-cursor = ()
+cursor = []
 font = {}
+
+def add_trailing_zero(mat):
+    if len(mat) == 16:
+        return mat
+    trailing_height = 16-len(mat)
+    result = np.concatenate((np.full((trailing_height,(len(mat[0]))),0),mat),axis=0)
+    print(result.shape)
+    return result
 
 def loadFont():
     script_dir = Path(__file__).parent
@@ -1175,7 +1183,7 @@ def DispPixels_fast(mat,dim, bg_color,font_color):
 
 def generateDim(mat_size):
     '''mat_size=(columns, rows)'''
-    return [cursor[0],cursor[0]+mat_size[0], cursor[1], cursor[1] + mat_size[1]]
+    return [cursor[0],cursor[0]+mat_size[0]-1, cursor[1], cursor[1] + mat_size[1]-1]
 
 def DispLetter(letter, bg_color,font_color,dim=None): 
     '''Only accepts a letter, not a word'''
@@ -1188,13 +1196,15 @@ def DispLetter(letter, bg_color,font_color,dim=None):
 
 def dispWord(word, bg_color, font_color, dim=None):
     '''Accepts a word, doesn't change lines by itself'''
-    word_mat = []
     if not font:
         loadFont()
-    for i in word:
-        word_mat = np.concatenate((word_mat,font[i]),axis=1)
-    DispPixels_fast(word_mat,generateDim((len(word_mat[0]),len(word_mat))))
-
+    word_mat = np.full((16,0),0)
+    print(word)
+    for i in range(len(word)):
+        letter = add_trailing_zero(font[word[i]])
+        word_mat = np.concatenate((word_mat,letter),axis=1)
+    print(word_mat)
+    DispPixels_fast(word_mat,generateDim((len(word_mat[0]),len(word_mat))),bg_color,font_color)
 def DispBlock(data1,data2):
     BlockWrite(100,139,100,139)
 
@@ -1238,11 +1248,12 @@ def test_display():
     print("Initializing display...")
     LCD_Init()
     print("init complete")
-    
-    DispColorQSPI(0xF8,0x00)
+    global cursor
+    DispColorQSPI(0x00,0x00)
+    cursor = [100,100]
     
     dispWord(
-        "Hello world!",
+        "Great",
         bg_color = (0xe8,0x00), # Red
         font_color = (0xff,0xe0) # Yellow
     )
