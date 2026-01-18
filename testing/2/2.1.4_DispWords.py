@@ -1246,19 +1246,19 @@ def test_display():
     GPIO.output(BL, GPIO.HIGH)
     
     print("Initializing display...")
+    time.sleep(4)
     LCD_Init()
     print("init complete")
     global cursor
-    DispColorQSPI(0x00,0x00)
-    cursor = [100,100]
+    DispColorQSPI(0xe8,0x00)
+    cursor = [100,180]
     
     dispWord(
-        "Great",
+        "Good morning",
         bg_color = (0xe8,0x00), # Red
         font_color = (0xff,0xe0) # Yellow
     )
-    time.sleep(10)
-    
+    wait = input("Enter sth when finish")    
     print("Test complete")
 
 if __name__ == "__main__":
