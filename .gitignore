@@ -1,6 +1,7 @@
 testing/4/images/
-testing/4/pencil_AI/
+testing/4/venv_pencil_AI/
 *.venv/
 *.jpg
 *.env
 testing/4/prediction_images
+testing/4/venv_sam
