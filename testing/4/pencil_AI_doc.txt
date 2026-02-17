@@ -1,0 +1,13 @@
+The AI workflow is a bit complicated that I think I myself will forget what I thought about. 
+Therefore I wrote this txt document.
+
+Brief description of how it will work:
+1. Raspberry pi camera takes a picture
+2. Resize it to 640*640
+3. Send it to SAM3 to draw bounding box of a pencil
+4. Crop that image so that you only get the pencil part
+5. Use a custom tensorflow model to get the coordinates of the pencil. (0,0) would be the top left of the cropped image (only the pencil part)
+6. Calculate the coordinate in terms of 640*640 image
+7. Rescale it to original size
+8. Use a OCR to get the characters & their coordinates
+9. Use simple math (I mean, simple) to calculate find the character nearest to pencil tip coordinate
