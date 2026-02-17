@@ -1,0 +1,20 @@
+[
+    {
+        "width": 116.0,
+        "height": 89.0,
+        "x": 197.0,
+        "y": 355.5,
+        "confidence": 0.93359375,
+        "class_id": 0,
+        "class": "pencil",
+        "detection_id": "97264a9a-296f-4d67-84fd-b5e883cf6cbe",
+        "parent_id": "image",
+        "rle_mask": {
+            "size": [
+                400,
+                300
+            ],
+            "counts": "Wcf12^<1O101N2N100O1O100O100O100000O010000O10O1000O10O1000O10000000O1000O10O1000O1000O10O100000000000O0100000O1000O10O010O1M3Jef=OaYB2N2N2O1N10000000O100O001O1O1O1O001O1ORVa0"
+        }
+    }
+]

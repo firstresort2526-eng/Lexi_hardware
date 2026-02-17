@@ -20,7 +20,7 @@ for path in filenames:
 
     print("Predicting")
     # run inference on our chosen image, image can be a url, a numpy array, a PIL image, etc.
-    results = model.infer(image,confidence=0.3)[0]
+    results = model.infer(image,confidence=0.1)[0]
 
     print("Getting reuslts")
     # load the results into the supervision Detections api
