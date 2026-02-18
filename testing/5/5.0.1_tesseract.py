@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Read image
-img = cv2.imread('image.png')
+img = cv2.imread('IMG_8261.jpg')
 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 h, w, _ = img.shape
 
 # Get character boxes (NO recognition)
 boxes = pytesseract.image_to_boxes(
     img_rgb,
-    lang='chi_sim',
+    lang='chi_tra',
     config='--psm 6'
 )
 
@@ -32,10 +32,13 @@ for box in boxes.splitlines():
         
         # Draw rectangle
         cv2.rectangle(img_rgb, (x1, y2), (x2, y1), (0, 255, 0), 2)
+print("Finished detecting")
 
 # Display
 plt.figure(figsize=(12, 8))
 plt.imshow(img_rgb)
 plt.axis('off')
 plt.title(f'Detected {len(boxes.splitlines())} Chinese characters')
+plt.tight_layout()  # Add this
+plt.savefig('output/output.png')
 plt.show()
