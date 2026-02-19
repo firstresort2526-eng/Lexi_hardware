@@ -5,4 +5,5 @@ testing/4/venv_pencil_AI/
 *.env
 testing/4/prediction_images
 testing/4/venv_sam
-testing/5/OCR
+testing/5/test
+*.png
