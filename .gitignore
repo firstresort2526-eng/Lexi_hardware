@@ -7,3 +7,9 @@ testing/4/prediction_images
 testing/4/venv_sam
 testing/5/test
 *.png
+testing/7/tf_env
+testing/6/3.11env
+testing/6/env
+testing/6/temp
+testing/5/test
+testing/5/test2

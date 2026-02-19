@@ -1,0 +1,5 @@
+2026/2/19 23:16 - So desperate. Just gave up on creating an environment that works for both tf and paddle. Gonna use flask
+2026/2/19 23:32 - For some reason the Flask works. I used deepseek to generate the flask code but whatever.
+2026/2/20 00:00 - Dad tells me to sleep -> me says "Wait me for 幾分鐘"
+2026/2/20 00:06 - First time rlly works in "幾分鐘", dk what i changed but it works.
+2026/2/20 00:10 - Ok, made sure that everything works well. Just that the pencil AI isn't 100% accurate when dealing with low resolution images (or blurry images simply). Let's push!
