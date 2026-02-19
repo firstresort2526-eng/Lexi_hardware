@@ -1,6 +1,6 @@
 from PIL import Image
 
-image = Image.open("001.png")
-target_size = (400,400)
+image = Image.open("IMG_8261.jpg")
+target_size = (500,666)
 resized = image.resize(target_size)
-resized.save('002.png')
+resized.save('resize_8261.jpg')
