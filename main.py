@@ -7,6 +7,8 @@ from playsound import playsound
 import os
 import datetime as dt
 import json  
+from fastapi import FastAPI, Request
+import uvicorn
 
 r = sr.Recognizer()
 mic = sr.Microphone()
@@ -35,48 +37,78 @@ def saveHistory(prompts, response):
         
     print(f"History saved at {new_entry['timestamp']}")
     
-def run_chat_cycle():
-
-    # 1 Record
-   with mic as source:
-    print("Recording...")
-    audio = r.listen(source, timeout=10, phrase_time_limit=20) 
-    text = r.recognize_google(audio, language="yue-Hant-hk")
-    print(f"用家: {text}")
-
-    if not text: return
-
-    # 2 Ollama
+def explain_text(text):
+    # Generate response from Ollama
     print("Thinking...")
     response = ollama.chat(model="qwen2.5:1.5b-instruct", messages=[
           {'role': 'system', 
-             'content': '10字以內'},
-
+             'content': '用粵語口語在四十字解釋以下詞語。如果有多個詞語，請分別簡短解釋每個詞語和整個句子的意思'},
         {'role': 'user',
          'content': f'解釋{text}'}
     ])
     reply = response['message']['content']
     print(f"Lexi 學習助手: {reply}")
 
-    saveHistory(text,reply)
-    # 3 Text to Speech
+    # Save history
+    saveHistory(text, reply)
+
+    # Text to Speech
     tts = gTTS(text=reply, lang='yue', slow=False)
     tts.save("output.mp3")
     playsound("output.mp3")
 
-    # 4 Delete temp file
+    # Delete temp file
     if os.path.exists("output.mp3"):
         os.remove("output.mp3")
 
+app = FastAPI()
+
+@app.post("/explain")
+async def process_camera_input(request: Request):
+    request_data = await request.json()
+    text = request_data["words"][0]["text"]
+    print(f"讀取鏡頭數據：{text}")
+    
+    # Run explain_text in a separate thread to avoid blocking
+    thread = threading.Thread(target=explain_text, args=(text,))
+    thread.start()
+    
+    return {"status": "processing", "text": text}
+
+def process_voice_input():
+    try:
+        with mic as source:
+            print("Recording...")
+            audio = r.listen(source, timeout=10, phrase_time_limit=20) 
+            text = r.recognize_google(audio, language="yue-Hant-hk")
+        print(f"用家: {text}")
+        explain_text(text)
+    except sr.UnknownValueError:
+        tts = gTTS(text="唔好意思，Lexi聽唔清楚你的查詢", lang='yue', slow=False)
+        tts.save("output.mp3")
+        playsound("output.mp3")
+    except Exception as e:
+        print(f"Error in voice processing: {e}")
+
 def on_press(key):
     try:
-        if key.char == 's':  
-            threading.Thread(target=run_chat_cycle).start()
-    except:
+        if hasattr(key, 'char') and key.char == 's':  
+            print("Voice input triggered...")
+            threading.Thread(target=process_voice_input).start()
+    except AttributeError:
         pass
 
-print("系統準備就緒. 輸入 's' 開始通話.")
+def run_server():
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
-listener = keyboard.Listener(on_press=on_press)
-listener.start()
-listener.join()
+# Main program
+
+print("系統準備就緒")
+print("按 's' - 用語音輸入查詢字義")
+print("FastAPI server starting at http://0.0.0.0:8000")
+
+server_thread = threading.Thread(target=run_server, daemon=True)
+server_thread.start()
+
+with keyboard.Listener(on_press=on_press) as listener:
+    listener.join()

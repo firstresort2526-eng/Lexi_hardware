@@ -1,3 +1,6 @@
+venv/
+history.txt
+output.mp3
 testing/4/images/
 testing/4/venv_pencil_AI/
 *.venv/
