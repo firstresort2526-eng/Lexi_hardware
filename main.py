@@ -66,7 +66,7 @@ app = FastAPI()
 @app.post("/explain")
 async def process_camera_input(request: Request):
     request_data = await request.json()
-    text = request_data["words"][0]["text"]
+    text = request_data["words"][-1]["text"]
     print(f"讀取鏡頭數據：{text}")
     
     # Run explain_text in a separate thread to avoid blocking
