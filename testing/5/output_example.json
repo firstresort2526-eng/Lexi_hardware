@@ -1,0 +1,61 @@
+[
+  {
+    "input_path": "resize_8261.jpg",
+    "page_index": null,
+    "doc_preprocessor_res": {
+      "input_path": null,
+      "page_index": null,
+      "input_img": "array([...], shape=(666, 500, 3), dtype=uint8)",
+      "model_settings": {
+        "use_doc_orientation_classify": true,
+        "use_doc_unwarping": true
+      },
+      "angle": 0,
+      "rot_img": "array([...], shape=(666, 500, 3), dtype=uint8)",
+      "output_img": "array([...], shape=(666, 500, 3), dtype=uint8)"
+    },
+    "dt_polys": [
+      "array([[0,132], ..., shape=(4,2), dtype=int16) [4 total entries]"
+    ],
+    "model_settings": {
+      "use_doc_preprocessor": true,
+      "use_textline_orientation": true
+    },
+    "text_det_params": {
+      "limit_side_len": 64,
+      "limit_type": "min",
+      "thresh": 0.3,
+      "max_side_limit": 4000,
+      "box_thresh": 0.6,
+      "unclip_ratio": 1.5
+    },
+    "text_type": "general",
+    "text_rec_score_thresh": 0.0,
+    "return_word_box": false,
+    "rec_texts": [
+      "炎夏日，一",
+      "於人類來說",
+      "一姿百態，美",
+      "在扇子大家族"
+    ],
+    "rec_scores": [
+      0.9607893228530884,
+      0.9675094485282898,
+      0.8733612895011902,
+      0.9804677963256836
+    ],
+    "rec_polys": [
+      "array([[0,132], ..., shape=(4,2), dtype=int16) [4 total entries]"
+    ],
+    "vis_fonts": [
+      "Font objects [4 total entries]"
+    ],
+    "textline_orientation_angles": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "rec_boxes": "array([[0,...,241], ...], shape=(4,4), dtype=int16)"
+  }
+]
