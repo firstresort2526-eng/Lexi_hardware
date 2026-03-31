@@ -3,12 +3,57 @@ import speech_recognition as sr
 import ollama
 from pynput import keyboard
 from gtts import gTTS
+import pygame
 from playsound import playsound
 import os
 import datetime as dt
 import json  
 from fastapi import FastAPI, Request
 import uvicorn
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initiate the firestore admin SDK
+cred = credentials.Certificate("lexi-adminsdk.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+def construct_ref(reflist, parent=db, i=0):
+    if i >= len(reflist):
+        return parent
+    current = reflist[i]
+    if i%2 == 0:
+        new_parent = parent.collection(current)
+    else:
+        new_parent = parent.document(current)
+    return construct_ref(reflist,parent=new_parent, i=i+1)
+
+def read_data(reflist):
+    '''
+    This is a helper function that helps read data from the database. 
+    Instead of doing the db.collection.document thing, you can simply do read_data([collection_name,document_name, ...])
+    '''
+    ref = construct_ref(reflist)
+    snapshot = ref.get()
+    if snapshot.exists:
+        return snapshot.to_dict()
+    return None
+
+def upload_data(path:list,json:dict):
+    '''
+    Upload the json data to the path, returns document id
+    '''
+    doc_ref = construct_ref(path)
+    document_result = doc_ref.add(json)
+    return document_result[1].id
+
+def upload_explanation_data(userid, json: dict) -> str:
+    '''
+    Upload the json data to the word_explanations entries, returns document id
+    '''
+    return upload_data(['word_explanations',userid,'entries'],json)
+
+print(upload_explanation_data("Developer",{'timestamp':firestore.SERVER_TIMESTAMP,'word':'成功'})) # Example data
 
 r = sr.Recognizer()
 mic = sr.Microphone()
