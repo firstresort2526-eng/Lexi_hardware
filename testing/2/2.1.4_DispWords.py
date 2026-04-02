@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 import time, json
 import numpy as np
 from pathlib import Path
+import math
 
 # Display size constants
 COL = 360
@@ -10,19 +11,45 @@ cursor = []
 font = {}
 
 def add_trailing_zero(mat):
-    if len(mat) == 16:
+    if len(mat) == 40:
         return mat
-    trailing_height = 16-len(mat)
+    trailing_height = 40-len(mat)
     result = np.concatenate((np.full((trailing_height,(len(mat[0]))),0),mat),axis=0)
     print(result.shape)
     return result
 
+def rotate_mat(mat, flip=True):
+    '''Rotate a matrix, angle parameter is in degree, not radian, also it only supports multiples of 90, cuz I don't think other values are useful & i want input and output dimensions same'''
+    """Rotate matrix by 90, 180, or 270 degrees."""
+    new_mat = np.rot90(mat, k=2)
+    if flip:
+        new_mat = np.flip(mat,axis=0)
+    return new_mat
+
+def upscale_mat(mat,multiplier: int):
+    return np.repeat(np.repeat(mat, multiplier, axis=0), multiplier, axis=1)
+
+def downscale_mat(mat, divisor: int):
+    old_shape = mat.shape
+    new_matrix_shape = tuple(math.ceil(d/divisor) for d in old_shape)
+    new_matrix = np.zeros(new_matrix_shape)
+    for i in range(new_matrix_shape[0]):
+        for j in range(new_matrix_shape[1]):
+            start_row = i * divisor
+            end_row = min(start_row + divisor, old_shape[0])
+            start_col = j * divisor
+            end_col = min(start_col + divisor, old_shape[1])
+            
+            block = mat[start_row:end_row, start_col:end_col]
+            new_matrix[i, j] = np.mean(block)
+    return new_matrix
+
 def loadFont():
     script_dir = Path(__file__).parent
-    file_path = (script_dir / "bitmap.json").resolve()
+    file_path = (script_dir / "chinese_bitmaps_40x40.npz").resolve()
     with open(file_path, "r") as f:
         global font
-        font = json.load(f)
+        font = np.load('chinese_bitmaps_40x40.npz', allow_pickle=True)
     
 
 def empty_array(color=[0x00,0x00]):
@@ -1185,26 +1212,24 @@ def generateDim(mat_size):
     '''mat_size=(columns, rows)'''
     return [cursor[0],cursor[0]+mat_size[0]-1, cursor[1], cursor[1] + mat_size[1]-1]
 
-def DispLetter(letter, bg_color,font_color,dim=None): 
-    '''Only accepts a letter, not a word'''
-    if not dim:
-        dim = generateDim(len(letter[0]),len(letter))
-    if not font:
-        loadFont()
-    letter_mat = font[letter]
-    DispPixels_fast(letter_mat,dim,bg_color,font_color)
+def lookup_words(char):
+    return font['bitmaps'][np.where(font['chars'] == char)[0][0]]
 
-def dispWord(word, bg_color, font_color, dim=None):
+def dispWord(word, bg_color, font_color, dim=None, flip=True):
     '''Accepts a word, doesn't change lines by itself'''
     if not font:
         loadFont()
-    word_mat = np.full((16,0),0)
+    word_mat = np.full((40,0),0)
     print(word)
     for i in range(len(word)):
-        letter = add_trailing_zero(font[word[i]])
+        letter = add_trailing_zero(lookup_words(word[i]))
         word_mat = np.concatenate((word_mat,letter),axis=1)
+    if flip:
+        word_mat = rotate_mat(word_mat,flip=True)
     print(word_mat)
     DispPixels_fast(word_mat,generateDim((len(word_mat[0]),len(word_mat))),bg_color,font_color)
+
+
 def DispBlock(data1,data2):
     BlockWrite(100,139,100,139)
 
@@ -1251,12 +1276,13 @@ def test_display():
     print("init complete")
     global cursor
     DispColorQSPI(0xe8,0x00)
-    cursor = [100,180]
+    cursor = [160,160]
     
     dispWord(
-        "Good morning",
+        "你",
         bg_color = (0xe8,0x00), # Red
-        font_color = (0xff,0xe0) # Yellow
+        font_color = (0xff,0xe0), # Yellow
+        flip = True
     )
     wait = input("Enter sth when finish")    
     print("Test complete")

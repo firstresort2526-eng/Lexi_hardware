@@ -53,7 +53,7 @@ class HeatmapToCoords(layers.Layer):
 
 startTime = time.perf_counter()
 
-IMAGE_PATH = "./images/IMG_8268.jpg"
+IMAGE_PATH = "./images/IMG_8289.jpg"
 
 sam_client = InferenceHTTPClient(
     api_url="https://serverless.roboflow.com",
@@ -158,6 +158,6 @@ plot_image(cropped_pencil_np,prediction)
 plot_image(init_img,(init_x,init_y))
 
 try:
-    os.remove("./temp/new_img.jpg")
+    os.remove("./temp/cropped.jpg")
 except Exception as e:
     print(f"Exception: {e}")
