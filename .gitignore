@@ -18,3 +18,5 @@ testing/5/test
 testing/5/test2
 lexi-adminsdk.json
 aud_venv/
+testing/7/paddle_env
+testing/7/tensorflow-env
