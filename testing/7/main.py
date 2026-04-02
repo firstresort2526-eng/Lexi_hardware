@@ -223,7 +223,6 @@ with open('temp/cropped_88888.jpg','rb') as f:
     encoded_string = base64.b64encode(f.read()).decode('utf-8')
 
 payload = {"image":encoded_string}
-audie_url = "http://localhost:8000/explain"
 
 # Let's handle the respond (Rare time when i use try except)
 try:
