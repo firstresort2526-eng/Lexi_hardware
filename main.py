@@ -3,14 +3,13 @@ import speech_recognition as sr
 import ollama
 from gtts import gTTS
 import pygame
-import os
-import datetime as dt
-import json  
+import os 
 from fastapi import FastAPI, Request
 import uvicorn
 import firebase_admin
 from firebase_admin import credentials, firestore
 import queue
+import ast
 
 camera_queue = queue.Queue()
 button_pressed = threading.Event()
@@ -41,70 +40,57 @@ def read_data(reflist):
     snapshot = ref.get()
     if snapshot.exists:
         return snapshot.to_dict()
-    return None
+    else:
+        return None
+    
+def word_exists(word):
+    ref = construct_ref(["word_explanations","Developer","entries",word])
+    snapshot = ref.get()
+    if snapshot.exists:
+        return True
+    else:
+        return False
+    
+
 
 def upload_data(path:list,json:dict):
     '''
     Upload the json data to the path, returns document id
     '''
     doc_ref = construct_ref(path)
-    document_result = doc_ref.add(json)
-    return document_result[1].id
+    doc_ref.set(json)
+    return json
 
-def upload_explanation_data(userid, json: dict) -> str:
+def upload_explanation_data(word, userid, json: dict) -> str:
     '''
     Upload the json data to the word_explanations entries, returns document id
     '''
-    return upload_data(['word_explanations',userid,'entries'],json)
+    return upload_data(['word_explanations',userid,'entries', word],json)
 
-print(upload_explanation_data("Developer",{'timestamp':firestore.SERVER_TIMESTAMP,'word':'成功'})) # Example data
 
 r = sr.Recognizer()
 mic = sr.Microphone()
 app = FastAPI()
 
-def saveHistory(prompts, response):
-    new_entry = {
-        "timestamp": dt.datetime.now().isoformat(),
-        "prompt": prompts,
-        "response": response
-    }
-
-    history = []
-    if os.path.exists('history.txt'):
-        try:
-            with open('history.txt', 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if content:  # If file is not empty
-                    history = json.loads(content)
-        except (json.JSONDecodeError, FileNotFoundError):
-            history = []
-    
-    history.append(new_entry)
-    
-    with open('history.txt', 'w', encoding='utf-8') as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
-        
-    print(f"History saved at {new_entry['timestamp']}")
-
 def explain_text(cam, voice):
-    text = f"鏡頭檢測到的詞語: {cam}\n用家語音補充: {voice}\n請根據以上資訊解釋"
+    text = f"鏡頭檢測到的詞語: {cam}\n用家語音補充: {voice}\n20字內根據以上資訊解釋，對象是向七歲兒童"
+    print(text)
     # Generate response from Ollama
     print("Thinking...")
-    response = ollama.chat(model="qwen2.5:1.5b-instruct", messages=[
+    response = ollama.chat(model="qwen3:4b-instruct", think=False, messages=[
           {'role': 'system', 
-             'content': '用粵語口語在四十字解釋以下詞語。如果有多個詞語，請分別簡短解釋每個詞語和整個句子的意思'},
+             'content': '回答格式：{"word": "詞彙", "meaning": "解釋"} 只輸出JSON，不要其他文字'},
         {'role': 'user',
          'content': f'解釋{text}'}
     ])
     reply = response['message']['content']
     print(f"Lexi 學習助手: {reply}")
 
-    # Save history
-    saveHistory(text, reply)
-
     # Text to Speech
-    tts = gTTS(text=reply, lang='yue', slow=False)
+    explanation_dict = ast.literal_eval(reply)
+    explanation = f"{explanation_dict.get("word")}嘅意思係{explanation_dict.get("meaning")}"
+    print(f"解釋{explanation}")
+    tts = gTTS(text=explanation, lang='yue', slow=True)
     tts.save("output.mp3")
 
     pygame.mixer.init()
@@ -113,6 +99,23 @@ def explain_text(cam, voice):
 
     while pygame.mixer.music.get_busy():
         pygame.time.wait(100)
+
+    # Upload to firebase
+
+    if word_exists(explanation_dict.get("word")):
+        ref = construct_ref(["word_explanations","Developer","entries",explanation_dict.get("word")])
+        current_counter = read_data(["word_explanations","Developer","entries",explanation_dict.get("word")]).get("counter")
+        ref.update({
+            "counter": current_counter + 1,
+            f"timestamp{current_counter}": firestore.SERVER_TIMESTAMP
+        })
+    else:
+        upload_explanation_data(userid="Developer", word=explanation_dict.get("word"),json={
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "word": explanation_dict.get("word"),
+            "explanation": explanation_dict.get("meaning"),
+            "counter":  1
+        })
 
     # Delete temp file
     if os.path.exists("output.mp3"):
@@ -143,7 +146,7 @@ async def button_press():
 @app.post("/camera_data")
 async def process_camera_input(request: Request):
     request_data = await request.json()
-    cam_data = request_data['words'][-1]['closest_char']
+    cam_data = request_data['words'][-1]
     camera_queue.put(cam_data)
     return {"status": "camera_data_received"}
 
@@ -154,7 +157,7 @@ def process_explanation():
     if voice_text is not None:
         current_voice_text = voice_text 
     else:
-        current_voice_text = "鏡頭偵測到嘅字係咩意思"
+        current_voice_text = "成句句子係咩意思"
     
     try:
         cam_data = camera_queue.get(timeout=10)

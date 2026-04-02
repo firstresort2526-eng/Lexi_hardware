@@ -232,8 +232,8 @@ try:
         result_json = results.json()
         print(result_json)
         # Now I need to send a post request to audie's FastAPI server
-        # Output from her server is {"status": "processing", "text": text}
-        aud_result = requests.post(url=audie_url,json=result_json)
+        # Output from her server is {"status": "camera_data_received"}
+        aud_result = requests.post(url="http://0.0.0.0:8000/camera_data",json=results.json())
         print(aud_result.json())
     else:
         print(f"Error code: {results.status_code}")
