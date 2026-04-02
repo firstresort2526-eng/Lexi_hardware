@@ -7,3 +7,7 @@ Required libraries:
 
 1. picamera2
 2. Time
+
+## 2/4/2026 Update
+
+I'm going to write a Flask server that takes a picture and send it to the /testing/7/image-processing-server.py

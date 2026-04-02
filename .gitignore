@@ -22,3 +22,4 @@ testing/7/paddle_env
 testing/7/tensorflow-env
 testing/7/test_img
 testing/7/temp/*
+testing/3/temp/*
