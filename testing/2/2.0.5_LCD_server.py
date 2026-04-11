@@ -6,7 +6,7 @@ import math
 from flask import Flask, request
 
 # Display size constants
-LED_PIN = 16
+LED_PIN = 26
 COL = 360
 ROW = 360
 cursor = []
@@ -15,7 +15,7 @@ font = {}
 def backlight(state):
     ''' Control the backlight of the projector, True = open, False = turn off'''
     GPIO_state = GPIO.HIGH if state else GPIO.LOW
-    GPIO.output(PIN, GPIO_state)
+    GPIO.output(LED_PIN, GPIO_state)
 
 def add_trailing_zero(mat):
     if len(mat) == 40:
@@ -1344,7 +1344,7 @@ def test_display():
 
 if __name__ == "__main__":
     try:
-        test_display()
+        app.run(debug=True, port=8888)
         GPIO.cleanup()
     except Exception as e:
         print(f"Error: {e}")
