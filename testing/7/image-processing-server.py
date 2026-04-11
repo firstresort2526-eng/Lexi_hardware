@@ -149,7 +149,7 @@ def process():
         plot_image(init_img,(init_x,init_y)) # Original image
 
     # Crop the target area for the OCR
-    target_area = (max(init_x-350, 0), max(0,init_y-350), min(3024,init_x+350), min(4032,init_y))
+    target_area = (max(init_x-1000, 0), max(init_y-1000),min(init_x+1000,init_size[0]),min(init_y+1000,init_size[1]))
     cropped_img = init_img.crop(target_area)
     cropped_img.save('temp/cropped_88888.jpg')
 
