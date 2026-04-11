@@ -167,13 +167,13 @@ def process_explanation():
         print(reply)
 
         response = requests.post("http://127.0.0.1:8000/projector_on", json=reply)
-        
+
         if response.status_code == 200:
             print("done")
             print(response.json())
 
     else:
-        response = requests.get('https://127.0.0.1:3141/capture')
+        response = requests.get('http://127.0.0.1:3141/capture')
         if response.status_code == 200:
             print("picture will be taken")
             print(response.json())
