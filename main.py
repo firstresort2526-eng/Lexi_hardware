@@ -10,12 +10,15 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import queue
 import ast
-import requests
+import requests, json
 
 camera_queue = queue.Queue()
 button_pressed = threading.Event()
 voice_done = threading.Event()
 voice_text = None
+
+OLLAMA_HOST = 'http://10.129.130.47:11434'
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
 # Initiate the firestore admin SDK
 cred = credentials.Certificate("lexi-adminsdk.json")
@@ -78,7 +81,7 @@ def explain_text(cam, voice):
     print(text)
     # Generate response from Ollama
     print("Thinking...")
-    response = ollama.chat(model="qwen3:4b-instruct", think=False, messages=[
+    response = ollama_client.chat(model="qwen3:4b-instruct", think=False, messages=[
           {'role': 'system', 
              'content': '回答格式：{"word": "詞彙", "meaning": "解釋"} 只輸出JSON，不要其他文字'},
         {'role': 'user',
@@ -157,7 +160,7 @@ def process_explanation():
     
     #if xie in voice _text, send to ollama then send endpoint to ollama call caspar end point 
     if "寫" in voice_text:
-        response = ollama.chat(model="qwen3:4b-instruct", think=False, messages=[
+        response = ollama_client.chat(model="qwen3:4b-instruct", think=False, messages=[
           {'role': 'system', 
              'content': '回答格式：{"word": "字"} 只輸出JSON，不要其他文字'},
         {'role': 'user',
@@ -166,7 +169,7 @@ def process_explanation():
         reply = response['message']['content']
         print(reply)
 
-        response = requests.post("http://127.0.0.1:8000/projector_on", json=reply)
+        response = requests.post("http://127.0.0.1:8888/projector_on", json=json.loads(reply))
 
         if response.status_code == 200:
             print("done")

@@ -1266,8 +1266,9 @@ written_word = ''
 def project():
     param = request.get_json()
     word = param.get('word')
+    print(word)
     dispWord(
-        "你",
+        word,
         bg_color=(0x00,0x00),
         font_color=(0xf8,0x00),
         flip=True
