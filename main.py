@@ -10,6 +10,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import queue
 import ast
+import requests
 
 camera_queue = queue.Queue()
 button_pressed = threading.Event()
@@ -154,17 +155,40 @@ def process_explanation():
     global voice_text
     voice_done.wait()
     
-    if voice_text is not None:
-        current_voice_text = voice_text 
+    #if xie in voice _text, send to ollama then send endpoint to ollama call caspar end point 
+    if "寫" in voice_text:
+        response = ollama.chat(model="qwen3:4b-instruct", think=False, messages=[
+          {'role': 'system', 
+             'content': '回答格式：{"word": "字"} 只輸出JSON，不要其他文字'},
+        {'role': 'user',
+         'content': f'請問用家想寫那個字：{voice_text}'}
+    ])
+        reply = response['message']['content']
+        print(reply)
+
+        response = requests.post("http://127.0.0.1:8000/projector_on", json=reply)
+
+        if response.status_code == 200:
+            print("done")
+            print(response.json())
+
     else:
-        current_voice_text = "成句句子係咩意思"
-    
-    try:
-        cam_data = camera_queue.get(timeout=10)
-    except:
-        cam_data = "未檢測到詞語"
-    
-    explain_text(cam_data, current_voice_text)
+        response = requests.get('http://127.0.0.1:3141/capture')
+        if response.status_code == 200:
+            print("picture will be taken")
+            print(response.json())
+
+        if voice_text is not None:
+            current_voice_text = voice_text 
+        else:
+            current_voice_text = "成句句子係咩意思"
+        
+        try:
+            cam_data = camera_queue.get(timeout=10)
+        except:
+            cam_data = "未檢測到詞語"
+        
+        explain_text(cam_data, current_voice_text)
     
 
 def run_server():
@@ -173,7 +197,7 @@ def run_server():
 # Main program
 
 print("系統準備就緒")
-print("FastAPI server starting at http://0.0.0.0:8000")
+print("FastAPI server starting at http://127.0.0.1:8000")
 
 server_thread = threading.Thread(target=run_server, daemon=True)
 server_thread.start()

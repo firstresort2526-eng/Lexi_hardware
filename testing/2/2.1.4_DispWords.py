@@ -1279,7 +1279,7 @@ def test_display():
     cursor = [160,160]
     
     dispWord(
-        "你",
+        "學習",
         bg_color = (0x00,0x00), # Red
         font_color = (0xff,0xe0), # Yellow
         flip = True
