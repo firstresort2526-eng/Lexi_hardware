@@ -1278,6 +1278,13 @@ def project():
     written_word = word
     return {'status':'success'}
 
+@app.route("/projector_light",methods=["POST"])
+def control():
+    params = request.get_json()
+    state = params.get('state')
+    backlight(state)
+    return {'status':'success'}
+
 @app.route("/projector_clear",methods=['GET'])
 def clear():
     global written_word
@@ -1300,7 +1307,19 @@ def black():
         return {'status':'success'}
     except Exception as e:
         return {'status':'error','error_message':e}
-
+    
+@app.route("/display_img", methods=['POST'])
+def show_img():
+    params = request.get_json()
+    mat = params.get('image',None)
+    if not mat:
+        return {"status":"error","error_message":f"Empty matrix. Detected matrix: {mat}"}
+    mat_size = mat.shape
+    if mat_size != (ROW,COL,2):
+        return {"status":"error","error_message":f"Wrong matrix size. Detected matrix size: {mat_size}"}
+    backlight(False)
+    DispPixels(mat)
+    backlight(True)
 
 # Test function
 def test_display():
