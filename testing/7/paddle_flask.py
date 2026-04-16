@@ -14,7 +14,6 @@ start_time = time.time()
 ocr = PaddleOCR(lang='ch', use_textline_orientation=True, cpu_threads=4)
 print(f"Model loaded in {time.time() - start_time:.2f} seconds")
 
-# Your existing classes (unchanged)
 class Line():
     def __init__(self,point1=None,point2=None,slope=None,b=None):
         if isinstance(slope,(float,int)) and isinstance(b,(float,int)):
