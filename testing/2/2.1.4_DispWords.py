@@ -1275,12 +1275,12 @@ def test_display():
     LCD_Init()
     print("init complete")
     global cursor
-    DispColorQSPI(0xe8,0x00)
+    DispColorQSPI(0x00,0x00)
     cursor = [160,160]
     
     dispWord(
-        "你",
-        bg_color = (0xe8,0x00), # Red
+        "學習",
+        bg_color = (0x00,0x00), # Red
         font_color = (0xff,0xe0), # Yellow
         flip = True
     )

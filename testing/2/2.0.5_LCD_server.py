@@ -6,10 +6,19 @@ import math
 from flask import Flask, request
 
 # Display size constants
+SI0 = 10   # GPIO 10 - Physical pin 19
+SI1 = 22    # GPIO 9  - Physical pin 21
+SI2 = 27   # GPIO 11 - Physical pin 23
+SI3 = 17    # GPIO 8  - Physical pin 24
+SCL = 11    # GPIO 7  - Physical pin 26
+CS0 = 5    # GPIO 5  - Physical pin 29
+RST = 25   # GPIO 25 - Physical pin 22
+BL = 16    # GPIO 16 - Physical pin 36
+
 LED_PIN = 26
 COL = 360
 ROW = 360
-cursor = []
+cursor = [160,160]
 font = {}
 
 def backlight(state):
@@ -1250,15 +1259,6 @@ def DispBlock(data1,data2):
             write_lcd(data1)
             write_lcd(data2)
 
-SI0 = 10   # GPIO 10 - Physical pin 19
-SI1 = 22    # GPIO 9  - Physical pin 21
-SI2 = 27   # GPIO 11 - Physical pin 23
-SI3 = 17    # GPIO 8  - Physical pin 24
-SCL = 11    # GPIO 7  - Physical pin 26
-CS0 = 5    # GPIO 5  - Physical pin 29
-RST = 25   # GPIO 25 - Physical pin 22
-BL = 16    # GPIO 16 - Physical pin 36
-
 app = Flask(__name__)
 written_word = ''
 
@@ -1266,6 +1266,7 @@ written_word = ''
 def project():
     param = request.get_json()
     word = param.get('word')
+    print(word)
     dispWord(
         word,
         bg_color=(0x00,0x00),
@@ -1275,9 +1276,11 @@ def project():
     backlight(True)
     global written_word
     written_word = word
+    return {'status':'success'}
 
 @app.route("/projector_clear",methods=['GET'])
 def clear():
+    global written_word
     backlight(False)
     dispWord(
         written_word,
@@ -1285,8 +1288,8 @@ def clear():
         font_color=(0x00,0x00),
         flip=False
     )
-    global written_word
     written_word = ""
+    return {'status':'success'}
 
 @app.route("/fill-screen",methods=['POST'])
 def black():
@@ -1344,7 +1347,13 @@ def test_display():
 
 if __name__ == "__main__":
     try:
-        app.run(debug=True, port=8888)
+        GPIO.setmode(GPIO.BCM)
+        for pin in [SI0, SI1, SI2, SI3, SCL, CS0, RST, BL,LED_PIN]:
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, GPIO.LOW)
+        GPIO.output(BL, GPIO.HIGH)
+        LCD_Init()
+        app.run(debug=False, port=8888)
         GPIO.cleanup()
     except Exception as e:
         print(f"Error: {e}")
