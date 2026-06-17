@@ -18,8 +18,8 @@ def init():
         exit()
 
     # Set resolution 2048*1536 (This is max resolution given by taobaoguy)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 2048)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1536)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75) # Set 曝光 to auto
     cap.set(cv2.CAP_PROP_AUTO_WB, 0.0)
     cap.set(cv2.CAP_PROP_WB_TEMPERATURE, 3800) # Set the 色温

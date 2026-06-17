@@ -12,6 +12,25 @@ from PIL import Image, ImageOps
 import numpy as np
 import matplotlib.pyplot as plt
 from requests.auth import HTTPProxyAuth
+import socket
+
+def get_rpi_ip():
+    """Get the RPi's IP address on the WiFi interface"""
+    try:
+        # Connect to an external server to get the local IP
+        # This doesn't actually send data, just gets the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google DNS
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception as e:
+        print(f"Error getting IP: {e}")
+        return None
+
+rpi_ip = get_rpi_ip()
+s = rpi_ip.split(".")
+computer_ip = f"http://{s[0]}.{s[1]}.{s[2]}.47"
 
 dotenv.load_dotenv()
 Api_key = os.getenv('ROBOFLOW_API_KEY') # Get Roboflow API key
@@ -90,7 +109,7 @@ def plot_image(image,coords):
     plt.figure(figsize=(8,8))
     plt.imshow(image)
     plt.scatter(coords[0],coords[1])
-    plt.show()
+    #plt.show()
     plt.savefig("./temp/output.jpg")
     print("   44.2 Plot saved")
     
@@ -162,11 +181,11 @@ def process():
         plot_image(init_img,(init_x,init_y)) # Original image
 
     # Crop the target area for the OCR
-    target_area = (max(init_x-1000, 0), max(init_y-1000,0),min(init_x+1000,init_size[0]),min(init_y+1000,init_size[1]))
+    target_area = (max(init_x-650, 0), max(init_y-200,0),min(init_x+650,init_size[0]),min(init_y+200,init_size[1]))
     cropped_img = init_img.crop(target_area)
     cropped_img.save('temp/cropped_88888.jpg')
 
-    server_url = "http://127.0.0.1:5000/ocr"
+    server_url = f"{computer_ip}:5000/ocr"
 
     with open('temp/cropped_88888.jpg','rb') as f:
         encoded_string = base64.b64encode(f.read()).decode('utf-8')

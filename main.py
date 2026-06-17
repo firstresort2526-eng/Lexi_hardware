@@ -17,6 +17,24 @@ import dotenv
 from PIL import Image
 from io import BytesIO
 import numpy as np
+import socket
+
+def get_rpi_ip():
+    """Get the RPi's IP address on the WiFi interface"""
+    try:
+        # Connect to an external server to get the local IP
+        # This doesn't actually send data, just gets the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google DNS
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception as e:
+        print(f"Error getting IP: {e}")
+        return None
+
+# Get your RPi's IP
+rpi_ip = get_rpi_ip()
 
 dotenv.load_dotenv()
 unsplash_API = os.getenv("ACCESS_KEY")
@@ -25,7 +43,8 @@ button_pressed = threading.Event()
 voice_done = threading.Event()
 voice_text = None
 
-OLLAMA_HOST = 'http://172.21.133.47:11434'
+s = rpi_ip.split(".")
+OLLAMA_HOST = f'http://{s[0]}.{s[1]}.{s[2]}.47:11434'
 ollama_client = ollama.Client(host=OLLAMA_HOST)
 
 # Initiate the firestore admin SDK
@@ -120,13 +139,13 @@ def project_image(word):
     print(respond.json())
 
 def explain_text(cam, voice):
-    text = f"鏡頭檢測到的詞語: {cam}\n用家語音補充: {voice}\n20字內根據以上資訊解釋，對象是向七歲兒童"
+    text = f"用家詢問的詞語: {cam[0]}\n文字出處: {cam[1]}\n用家語音補充: {voice}\n對象: 9歲小朋友\n\n請運用以上資訊，簡短地解釋詞語在句字中的意思"
     print(text)
     # Generate response from Ollama
     print("Thinking...")
     response = ollama_client.chat(model="qwen3:4b-instruct", think=False, messages=[
           {'role': 'system', 
-             'content': '回答格式：{"word": "詞彙", "meaning": "解釋"} 只輸出JSON，不要其他文字'},
+             'content': '回答格式：{"word": "詞彙", "meaning": "詞語在文中的意思"} 只輸出JSON，不要其他文字；詞彙可多於一個字；解釋只可包含中文'},
         {'role': 'user',
          'content': f'解釋{text}'}
     ])
@@ -136,7 +155,7 @@ def explain_text(cam, voice):
     # Text to Speech
     explanation_dict = ast.literal_eval(reply)
     word = explanation_dict.get("word")
-    project_image(word)
+    # project_image(word) # This trying to project a word but it's beta function, not finished so for testing we comment it out
     meaning = explanation_dict.get("meaning")
     explanation = f"你指住嘅字係{word}，佢嘅意思係{meaning}"
     print(f"解釋{explanation}")
@@ -168,8 +187,8 @@ def explain_text(cam, voice):
         })
 
     # Delete temp file
-    if os.path.exists("output.mp3"):
-        os.remove("output.mp3")
+    #if os.path.exists("output.mp3"):
+    #    os.remove("output.mp3")
 
 def process_voice_input():
     global voice_text
@@ -196,8 +215,12 @@ async def button_press():
 @app.post("/camera_data")
 async def process_camera_input(request: Request):
     request_data = await request.json()
-    cam_data = request_data['words'][-1]
-    camera_queue.put(cam_data)
+    words_list = request_data['words']
+    cam_data = words_list[0]['closest_char']
+    context = ""
+    for i in words_list:
+        context += i['text'] 
+    camera_queue.put((cam_data,context))
     return {"status": "camera_data_received"}
 
 def process_explanation():
