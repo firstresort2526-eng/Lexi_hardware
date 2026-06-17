@@ -69,10 +69,18 @@ def calc_posits(poly, chars):
         ]
     return chars_posits
 
-def calc_distance(point1,point2=(350,350)):
-    return abs(point1[1]-point2[1])**2 + abs(point1[0]-point2[0])**2
+def calc_distance(point1, point2=None, image_size=None):
+    if point2 is None:
+        if image_size is None:
+            point2 = (350, 350)
+        else:
+            point2 = (image_size[0] / 2, image_size[1] / 2)
 
-def find_nearest_char(chars_posits):
+    dx = point1[0] - point2[0]
+    dy = point1[1] - point2[1]
+    return dx * dx + dy * dy
+
+def find_nearest_char(chars_posits, image_size=None):
     print(chars_posits)
     distances = []
     for key,value in chars_posits.items():
@@ -80,13 +88,13 @@ def find_nearest_char(chars_posits):
         middle_x = value[3][0] + (value[2][0] - value[3][0]) / 2
         middle_point = (middle_x,bottom_line.find_y(middle_x))
 
-        distance = (calc_distance(point1 = middle_point),key)
+        distance = (calc_distance(point1=middle_point, image_size=image_size), key)
         distances.append(distance)
 
     distances.sort()
     return distances
 
-def process_image(image_data):
+def process_image(image_data,image_size):
     """Process image and return just the words with their distances"""
     
     # Save temporarily (or you can work with PIL/CV2 directly)
@@ -99,18 +107,31 @@ def process_image(image_data):
     # Extract just the words with their nearest char info
     results = []
     for i, (poly, text) in enumerate(zip(prediction['rec_polys'], prediction['rec_texts'])):
-        distances = find_nearest_char(calc_posits(poly, text))
-        
+        distances = find_nearest_char(calc_posits(poly, text), image_size=image_size)
+        second_exists = len(distances) > 1
         # Format: just the words with their closest character info
         words_info = {
             'line': i,
             'text': text,
             'closest_char': distances[0][1] if distances else None,
-            'second_closest': distances[1][1] if len(distances) > 1 else None
+            'second_closest': distances[1][1] if second_exists else None,
+            'closest_distance': distances[0][0] if distances else None,
+            'second_closest_distance': distances[1][0] if second_exists else None,
         }
         results.append(words_info)
     
-    return results
+    return results[find_nearest_index(results):]
+
+def find_nearest_index(words_list):
+    nearest = words_list[0]['closest_distance']
+    index = 0
+    while True:
+        if len(words_list) > index+1:
+            if words_list[index+1]["closest_distance"] > words_list[index]['closest_distance']:
+                return index
+        else:
+            return index 
+        index += 1
 
 # Create Flask app
 app = Flask(__name__)
@@ -129,7 +150,9 @@ def ocr_endpoint():
                 "line": 0,
                 "text": "recognised_text",
                 "closest_char": "nearest_text",
-                "second_closest": "2nd_nearest_text"
+                "second_closest": "2nd_nearest_text",
+                "closest_distance": float,
+                "second_closest_distance":float
             },
             ...
         ]
@@ -152,9 +175,10 @@ def ocr_endpoint():
         # Decode base64 to image
         image_bytes = base64.b64decode(image_base64)
         image = Image.open(io.BytesIO(image_bytes))
+        image_size = image.size
         
         # Process the image
-        results = process_image(image)
+        results = process_image(image, image_size)
         
         # Return just the words (you can customize what you need)
         return jsonify({
@@ -171,4 +195,4 @@ def health():
 
 if __name__ == '__main__':
     # Run the server
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
