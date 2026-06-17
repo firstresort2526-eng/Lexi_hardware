@@ -11,7 +11,13 @@ from firebase_admin import credentials, firestore
 import queue
 import ast
 import requests, json
+import dotenv
+from PIL import Image
+from io import BytesIO
+import numpy as np
 
+dotenv.load_dotenv()
+unsplash_API = os.getenv("ACCESS_KEY")
 camera_queue = queue.Queue()
 button_pressed = threading.Event()
 voice_done = threading.Event()
@@ -76,6 +82,41 @@ r = sr.Recognizer()
 mic = sr.Microphone()
 app = FastAPI()
 
+def rgb565(img_array):
+    """
+    Converts an (H, W, 3) RGB888 array to an (H, W, 2) RGB565 byte array.
+    """
+    # 1. Extract channels
+    R = img_array[:,:,0].astype(np.uint16)
+    G = img_array[:,:,1].astype(np.uint16)
+    B = img_array[:,:,2].astype(np.uint16)
+
+    # 2. Pack into a single 16-bit integer
+    # Red: bits 11-15 | Green: bits 5-10 | Blue: bits 0-4
+    rgb565 = ((R & 0xF8) << 8) | ((G & 0xFC) << 3) | (B >> 3)
+
+    high_byte = (rgb565 >> 8).astype(np.uint8)
+    low_byte = (rgb565 & 0xFF).astype(np.uint8)
+
+    # 4. Stack back into (H, W, 2)
+    # Use axis=-1 to create the new depth dimension
+    return np.stack((high_byte, low_byte), axis=-1)
+
+def project_image(word):
+    url = f"https://api.unsplash.com/search/photos?query={word}&per_page=1"
+    header = {'Authorization': f"Client-ID {unsplash_API}"}
+
+    result = requests.get(url,headers=header).json()
+    image_url = result['results'][0]['urls']['small']  # 400px width
+
+    image_response = requests.get(image_url)
+    img = Image.open(BytesIO(image_response.content))
+    img_320 = img.resize((320, 320), Image.Resampling.LANCZOS)
+    lcd_img = rgb565(np.array(img_320))
+    projector_url = "http://127.0.0.1:8888/display_img"
+    respond = requests.post(projector_url, json={'image':lcd_img})
+    print(respond.json())
+
 def explain_text(cam, voice):
     text = f"鏡頭檢測到的詞語: {cam}\n用家語音補充: {voice}\n20字內根據以上資訊解釋，對象是向七歲兒童"
     print(text)
@@ -92,7 +133,10 @@ def explain_text(cam, voice):
 
     # Text to Speech
     explanation_dict = ast.literal_eval(reply)
-    explanation = f"{explanation_dict.get("word")}嘅意思係{explanation_dict.get("meaning")}"
+    word = explanation_dict.get("word")
+    project_image(word)
+    meaning = explanation_dict.get("meaning")
+    explanation = f"你指住嘅字係{word}，佢嘅意思係{meaning}"
     print(f"解釋{explanation}")
     tts = gTTS(text=explanation, lang='yue', slow=True)
     tts.save("output.mp3")
