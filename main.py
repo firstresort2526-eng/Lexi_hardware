@@ -1,3 +1,5 @@
+# Server_url is 127.0.0.1/8000
+
 import threading
 import speech_recognition as sr
 import ollama
@@ -23,7 +25,7 @@ button_pressed = threading.Event()
 voice_done = threading.Event()
 voice_text = None
 
-OLLAMA_HOST = 'http://10.129.130.47:11434'
+OLLAMA_HOST = 'http://172.21.133.47:11434'
 ollama_client = ollama.Client(host=OLLAMA_HOST)
 
 # Initiate the firestore admin SDK
@@ -208,7 +210,7 @@ def process_explanation():
           {'role': 'system', 
              'content': '回答格式：{"word": "字"} 只輸出JSON，不要其他文字'},
         {'role': 'user',
-         'content': f'請問用家想寫那個字：{voice_text}'}
+         'content': f'用家想寫哪一個詞語？用家說：{voice_text}'}
     ])
         reply = response['message']['content']
         print(reply)
