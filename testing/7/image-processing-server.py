@@ -1,3 +1,5 @@
+# Server url is 127.0.0.1:3000
+
 from flask import Flask, request, jsonify
 import os
 import dotenv
@@ -9,30 +11,41 @@ from tensorflow.keras import layers
 from PIL import Image, ImageOps
 import numpy as np
 import matplotlib.pyplot as plt
-from inference_sdk import InferenceHTTPClient
+from requests.auth import HTTPProxyAuth
 
 dotenv.load_dotenv()
-api_key = os.getenv('ROBOFLOW_API_KEY') # Get Roboflow API key
+Api_key = os.getenv('ROBOFLOW_API_KEY') # Get Roboflow API key
 
-print(api_key)
-client = InferenceHTTPClient(
-    api_url="https://serverless.roboflow.com",
-    api_key=api_key
-)
-
-def run_sam_workflow(image_path):    
-    result = client.run_workflow(
-        workspace_name="caspar9872",
-        workflow_id="sam3-with-prompts",
-        images={
-            "image": image_path # Path to your image file
-        },
-        parameters={
+def run_sam_workflow(image_path, api_key=Api_key):
+    header = {
+        "Content-Type": "application/json",
+    }
+    proxies = {
+        "http": "http://38.154.203.95:5863/",
+        "https": "http://38.154.203.95:5863/"
+    }
+    with open(image_path, "rb") as f:
+        img_base64 = base64.b64encode(f.read()).decode()
+    
+    payload = {
+        "api_key": api_key,
+        "inputs": {
+            "image": {
+                "type": "base64",
+                "value": img_base64
+            },
             "prompts": ["pencil"]
-        },
-        use_cache=True # Speeds up repeated requests
+        }
+    }
+    
+    response = requests.post(
+        "https://serverless.roboflow.com/caspar9872/workflows/sam3-with-prompts",
+        json=payload,
+        headers=header,
+        proxies=proxies
     )
-    return result
+    print(json.dumps(response.json())[0:1000])
+    return response.json()['outputs']
 
 # Define the Tensorflow custom layer HeatmapToCoords
 @tf.keras.utils.register_keras_serializable()
@@ -149,7 +162,7 @@ def process():
         plot_image(init_img,(init_x,init_y)) # Original image
 
     # Crop the target area for the OCR
-    target_area = (max(init_x-1000, 0), max(init_y-1000),min(init_x+1000,init_size[0]),min(init_y+1000,init_size[1]))
+    target_area = (max(init_x-1000, 0), max(init_y-1000,0),min(init_x+1000,init_size[0]),min(init_y+1000,init_size[1]))
     cropped_img = init_img.crop(target_area)
     cropped_img.save('temp/cropped_88888.jpg')
 
@@ -159,7 +172,7 @@ def process():
         encoded_string = base64.b64encode(f.read()).decode('utf-8')
 
     payload = {"image":encoded_string}
-    audie_url = "http://localhost:8000/camera_data"
+    audie_url = "http://127.0.0.1:8000/camera_data"
 
     # Let's handle the respond (Rare time when i use try except)
     try:

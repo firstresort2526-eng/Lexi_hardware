@@ -1,4 +1,5 @@
-# paddle_ocr_server.py
+# Server_url is 127.0.0.1/5000
+
 from flask import Flask, request, jsonify
 from paddleocr import PaddleOCR
 import base64
