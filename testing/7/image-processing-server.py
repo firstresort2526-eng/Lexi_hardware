@@ -181,7 +181,7 @@ def process():
         plot_image(init_img,(init_x,init_y)) # Original image
 
     # Crop the target area for the OCR
-    target_area = (max(init_x-650, 0), max(init_y-200,0),min(init_x+650,init_size[0]),min(init_y+200,init_size[1]))
+    target_area = (max(init_x-500, 0), max(init_y-200,0),min(init_x+500,init_size[0]),min(init_y+200,init_size[1]))
     cropped_img = init_img.crop(target_area)
     cropped_img.save('temp/cropped_88888.jpg')
 
@@ -204,7 +204,7 @@ def process():
             # Output from her server is {"status": "processing", "text": text}
             aud_result = requests.post(url=audie_url,json=result_json)
             print(aud_result.json())
-            return jsonify({"status": "success", "coordinates": {"x": init_x, "y": init_y}})
+            return jsonify({"status": "success"})
         else:
             print(f"Error code: {results.status_code}")
             return jsonify({"status": "error", "message": f"OCR failed with code {results.status_code}"}), results.status_code
