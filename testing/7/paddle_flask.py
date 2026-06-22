@@ -12,7 +12,11 @@ import time
 # Load model ONCE at startup (not per request)
 print("Loading PaddleOCR model...")
 start_time = time.time()
-ocr = PaddleOCR(lang='ch', use_textline_orientation=True, cpu_threads=4)
+ocr = PaddleOCR(
+    lang='ch', 
+    use_textline_orientation=False,
+    enable_mkldnn=True,
+    ocr_version='PP-OCRv4')
 print(f"Model loaded in {time.time() - start_time:.2f} seconds")
 
 class Line():
@@ -91,11 +95,11 @@ def process_image(image_data,image_size):
     """Process image and return just the words with their distances"""
     
     # Save temporarily (or you can work with PIL/CV2 directly)
-    temp_path = "/tmp/ocr_image.jpg"
-    image_data.save(temp_path)
+    #temp_path = "/tmp/ocr_image.jpg"
+    #image_data.save(temp_path)
     
     # Run OCR
-    prediction = ocr.predict(temp_path)[0]
+    prediction = ocr.predict(image_data)[0]
     
     # Extract just the words with their nearest char info
     results = []
@@ -151,7 +155,7 @@ def ocr_endpoint():
         ]
     }
     """
-    start_time = time.perf_counter()
+    starttime = time.perf_counter()
     try:
         # Get JSON data
         data = request.get_json()
@@ -168,13 +172,19 @@ def ocr_endpoint():
         
         # Decode base64 to image
         image_bytes = base64.b64decode(image_base64)
-        image = Image.open(io.BytesIO(image_bytes))
-        image_size = image.size
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        cv2_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if cv2_img is None:
+            return jsonify({'error': 'Failed to decode image'}), 400
+            
+        # Get dimensions from the cv2 matrix (height, width)
+        h, w, _ = cv2_img.shape
+        image_size = (w, h)
         
         # Process the image
-        results = process_image(image, image_size)
-        end_time = time.perf_counter()
-        print(start_time-end_time)
+        results = process_image(cv2_img, image_size)
+        endtime = time.perf_counter()
+        print(starttime-endtime)
         # Return just the words (you can customize what you need)
         return jsonify({
             'words': results
