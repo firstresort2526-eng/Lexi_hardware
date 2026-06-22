@@ -22,17 +22,13 @@ class Line():
             self.b = b
             return
         if hasattr(point1, '__len__') and hasattr(point2, '__len__'):
-            print(f"  Case 2: point1 type={type(point1)}, point2 type={type(point2)}")
             self.slope = (point2[1]-point1[1]) / (point2[0]-point1[0])
             self.b = point1[1] - self.slope*point1[0]
-            print(f"  Calculated: slope={self.slope}, type={type(self.slope)}, b={self.b}")
             return
         self.slope=None
         self.b=None
     def find_y(self,x):
-        print(self.slope, type(self.slope))
         if isinstance(self.slope,float):
-            print("find_y")
             return self.slope*x + self.b
 
 def calc_posits(poly, chars):
@@ -45,10 +41,8 @@ def calc_posits(poly, chars):
     top_char_width = (topright[0] - topleft[0]) / length
     bottom_char_width = (bottomright[0] - bottomleft[0]) / length
 
-    print(topleft,topright,bottomleft,bottomright, sep=",")
     top_horizontal_line = Line(point1=topleft, point2=topright)
     bottom_horizontal_line = Line(point1=bottomleft, point2=bottomright)
-    print(top_horizontal_line.find_y(344))
 
     bottom_points = []
     top_points = []
@@ -78,10 +72,9 @@ def calc_distance(point1, point2=None, image_size=None):
 
     dx = point1[0] - point2[0]
     dy = point1[1] - point2[1]
-    return dx * dx + dy * dy
+    return dx * dx + 0.05 * dy * dy
 
 def find_nearest_char(chars_posits, image_size=None):
-    print(chars_posits)
     distances = []
     for key,value in chars_posits.items():
         bottom_line = Line(point1=value[3],point2=value[2])
@@ -158,6 +151,7 @@ def ocr_endpoint():
         ]
     }
     """
+    start_time = time.perf_counter()
     try:
         # Get JSON data
         data = request.get_json()
@@ -179,7 +173,8 @@ def ocr_endpoint():
         
         # Process the image
         results = process_image(image, image_size)
-        
+        end_time = time.perf_counter()
+        print(start_time-end_time)
         # Return just the words (you can customize what you need)
         return jsonify({
             'words': results
