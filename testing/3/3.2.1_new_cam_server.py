@@ -35,6 +35,7 @@ def capture(): # Also will send to the server alr
 
     if ret:
         # Save the image
+        cv2.imwrite("capture.jpg", frame)
         success, encoded_image = cv2.imencode('.jpg', frame)
         if success:
             # Convert to base64 bytes
