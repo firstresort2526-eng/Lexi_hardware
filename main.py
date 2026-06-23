@@ -26,6 +26,8 @@ from google import genai
 import time
 import json
 import re
+from functools import wraps
+from fireworks import Fireworks, AsyncFireworks
 
 def get_rpi_ip():
     """Get the RPi's IP address on the WiFi interface"""
@@ -48,7 +50,7 @@ dotenv.load_dotenv()
 unsplash_API = os.getenv("ACCESS_KEY")
 gemini_API = os.getenv("GEMINI_KEY")
 
-gemini_client = genai.Client(api_key=gemini_API)
+client = Fireworks(api_key=os.environ["FIREWORKS_API_KEY"])
 explanation_chat = None
 explanation_timestamp = 0
 camera_queue = queue.Queue()
@@ -56,7 +58,20 @@ button_pressed = threading.Event()
 voice_done = threading.Event()
 voice_text = None
 
-from functools import wraps
+class Chat():
+    def __init__(self,system_prompt):
+        self.history = [{'role':'system','content':system_prompt}]
+    
+    def send_message(self,question,reasoning='low'):
+        self.history.append({'role':'user','content':question})
+        completion = client.chat.completions.create(
+            model="accounts/fireworks/models/deepseek-v4-flash",
+            messages=self.history,
+            reasoning_effort=reasoning
+        )
+        answer = completion.choices[0].message.content
+        self.history.append({'role':'assistant','content':answer})
+        return answer
 
 def count_time(func):
     @wraps(func)  # Preserves the original function's name and docstring
@@ -131,6 +146,8 @@ def upload_explanation_data(word, userid, json: dict) -> str:
 r = sr.Recognizer()
 mic = sr.Microphone()
 app = FastAPI()
+pygame.mixer.init()
+pygame.mixer.music.set_volume(0.15)
 
 def rgb565(img_array):
     """
@@ -167,75 +184,66 @@ def project_image(word):
     respond = requests.post(projector_url, json={'image':lcd_img})
     print(respond.json())
 
-def play_explain_audio(explanation,slow=True):
+def play_explain_audio(explanation,slow=True, blocking=True):
     tts = gTTS(text=explanation, lang='yue', slow=slow)
     tts.save("output.mp3")
 
-    pygame.mixer.init()
     pygame.mixer.music.load("output.mp3")
     pygame.mixer.music.play()
-
-    while pygame.mixer.music.get_busy():
-        pygame.time.wait(100)
+    if blocking:
+        while pygame.mixer.music.get_busy():
+            pygame.time.wait(100)
 
 @count_time
 def explain_text(cam, voice):
     global explanation_chat, explanation_timestamp
-    prompt = f"用家詢問的詞語: {cam[0]}\n文字出處: {cam[1]}\n用家語音補充: {voice}\n對象: 9歲小朋友\n\n請運用以上資訊，精簡地解釋詞語在句字中的意思"
+    play_explain_audio("我都諗緊個字嘅意思",slow=False,blocking=False)
+    prompt = f"用家指着的字: {cam[0]}\n文字出處: {cam[1]}\n用家語音補充: {voice}"
     print(prompt)
     # Generate response from Ollama
     print("Thinking...")
-    '''response = ollama_client.chat(model="qwen3:4b-instruct", think=False, messages=[
-          {'role': 'system', 
-             'content': '回答格式：{"word": "詢問的詞彙", "meaning": "解釋"} 只輸出JSON，不可含有其他文字；詞彙可多於一個字（需要時根據「文字出處」配詞）；解釋須用廣東話口語'},
-        {'role': 'user',
-         'content': f'解釋{text}'}
-    ])'''
 
-    explanation_chat = gemini_client.chats.create(
-        model="gemini-2.5-flash-lite",
-        config={"system_instruction": '回答格式：{"word": "詢問的詞彙", "meaning": "解釋"} 只輸出JSON，不可含有其他文字或符號；詞彙可多於一個字（需要時根據「文字出處」配詞）；解釋須用廣東話口語'}
-    )
-    reply = re.search(r'\{.*\}',explanation_chat.send_message(prompt).text).match()
+    explanation_chat = Chat('''你係為讀寫障礙小學生而設嘅學習助手。用家會把鉛筆指向某中文字，請依照文字出處判斷用家希望得到解釋嘅詞語，請用廣東話
+回答格式必須為有效JSON，不得包含其他文字。
+{"word": 所問詞語, "meaning": 用作flashcard嘅極短解釋（10字以內）, "audio": 簡短、一至兩句小孩亦能明白嘅解釋...}''')
+    text_reply = explanation_chat.send_message(prompt)
+    reply = json.loads(text_reply)
+
+    audio_reply = f"你指住嘅詞語係{reply['word']}，{reply['audio']}"
     explanation_timestamp = time.perf_counter()
 
     print(f"Lexi 學習助手: {reply}")
+    play_explain_audio(audio_reply)
 
-    # Text to Speech
-    explanation_dict = ast.literal_eval(reply)
-    word = explanation_dict.get("word")
-    # project_image(word) # This trying to project a word but it's beta function, not finished so for testing we comment it out
-    meaning = explanation_dict.get("meaning")
-    explanation = f"你指住嘅字係{word}，佢嘅意思係{meaning}"
-    print(f"解釋{explanation}")
-    play_explain_audio(explanation)
-
+    word = reply['word']
+    meaning = reply['meaning']
     # Upload to firebase
 
-    if word_exists(explanation_dict.get("word")):
-        ref = construct_ref(["word_explanations","Developer","entries",explanation_dict.get("word")])
-        current_counter = read_data(["word_explanations","Developer","entries",explanation_dict.get("word")]).get("counter")
+    if word_exists(word):
+        ref = construct_ref(["word_explanations","Developer","entries",word])
+        current_counter = read_data(["word_explanations","Developer","entries",word]).get("counter")
         ref.update({
             "counter": current_counter + 1,
             f"timestamp{current_counter}": firestore.SERVER_TIMESTAMP
         })
     else:
-        upload_explanation_data(userid="Developer", word=explanation_dict.get("word"),json={
+        upload_explanation_data(userid="Developer", word=word,json={
             "timestamp": firestore.SERVER_TIMESTAMP,
-            "word": explanation_dict.get("word"),
-            "explanation": explanation_dict.get("meaning"),
+            "word": word,
+            "explanation": meaning,
             "counter":  1
         })
 
     # Delete temp file
-    #if os.path.exists("output.mp3"):
-    #    os.remove("output.mp3")
+    if os.path.exists("/output.mp3"):
+       os.remove("/output.mp3")
 
 def process_voice_input():
     global voice_text
     try:
         with mic as source:
             print("Recording...")
+            play_explain_audio("Lexi聽緊",slow=False)
             audio = r.listen(source, timeout=10, phrase_time_limit=20) 
             voice_text = r.recognize_google(audio, language="yue-Hant-hk")
         print(f"用家: {voice_text}")
@@ -266,34 +274,29 @@ async def process_camera_input(request: Request):
 
 @count_time
 def categorize_instructions(audio_prompt):
-    categorize_client = gemini_client.chats.create(
-        model="gemini-2.5-flash-lite",
-        config={
-            "system_instruction": '''用家會向你提出問題，請辨別問題種類。
-            1. 如何寫某字 - 輸出{"type":"write","word":$用家在詢問的詞語}
-            2. 某字的意思（例如用家問「呢個字點解？」或「咁呢隻字咩意思」 - 輸出{"type":"explanation","question":$直接抄寫用家的問題}
+    system_prompt = '''用家會向你提出問題，請辨別問題種類。只須回答有效JSON，不可含有其他字句。
+            1. 如何寫某字（例如「籃球點寫」、「點樣寫學習」） - 輸出{"type":"write","word":$用家在詢問的詞語}
+            2. 某字的意思（例如用家問「呢個字點解？」或「咁呢隻字咩意思」或「我唔識呢隻字」 - 輸出{"type":"explanation","question":$直接抄寫用家的問題}
             3. 追問關於同一隻字（例如用家問「咁呢個詞語點樣造句」或「呢個字嘅詞性係咩」） - 輸出{"type":"follow_up","question":$直接抄寫用家的問題}
             4. 不是直接要求課業答案，而是其他學習相關問題 - 輸出{"type":"other","reply":$精簡地回答}
             5. 要求替他做功課，或與學習無關的問題 - 輸出{"type":"not_related","reply":$精簡地鼓勵用家先完成課業，表明可以指導他寫字/理解句子}'''
-        }
-    )
-    result = json.loads(re.search(r'\{.*\}',categorize_client.send_message(audio_prompt).text).group())
-    print(result)
-    return result
+    categorizer = Chat(system_prompt)
+    return json.loads(categorizer.send_message(audio_prompt))
 
 def explanation_branch(voice_text):
     print("picture will be taken")
+    play_explain_audio("知道，幫緊你睇",slow=False,blocking=False)
     response = requests.get('http://127.0.0.1:3141/capture')
     if response.status_code == 200:
         print("picture will be taken")
         print(response.json())
     try:
-        cam_data = camera_queue.get(timeout=100)
+        cam_data = camera_queue.get(timeout=15)
         print(cam_data)
         explain_text(cam_data, voice_text)
     except Exception as e:
         print(f"Error: {e}")
-        play_explain_audio("我偵測唔到你指住嘅文字，請再試多次")
+        play_explain_audio("我偵測唔到你指住嘅文字，請再試多次",slow=False)
 
 def process_explanation():
     global voice_text, explanation_chat, explanation_timestamp
@@ -302,6 +305,7 @@ def process_explanation():
         category = categorize_instructions(voice_text)
         match category['type']:
             case "write":
+                play_explain_audio("收到！開緊AR字帖",slow=False,blocking=False)
                 response = requests.post("http://127.0.0.1:8888/projector_on", json={"word":category['word']})
                 if response.status_code == 200:
                     print("done")
@@ -313,8 +317,8 @@ def process_explanation():
                     explanation_chat = None
 
                 if explanation_chat:
-                    respond = explanation_chat.send_message(category['question']).text
-                    play_explain_audio(respond)
+                    respond = explanation_chat.send_message(category['question'])
+                    play_explain_audio(json.loads(respond)['audio'])
                 else:
                     explanation_branch(category['question'])
             case "not_related":
@@ -324,42 +328,6 @@ def process_explanation():
                 play_explain_audio("我唔係好明你講咩，請你試吓再講多次。", slow=False)
     else:
         play_explain_audio("我聽唔清楚你講咩，請你再講多次", slow=False)
-
-    #if xie in voice _text, send to ollama then send endpoint to ollama call caspar end point 
-    '''if "寫" in voice_text:
-        response = ollama_client.chat(model="qwen3:4b-instruct", think=False, messages=[
-          {'role': 'system', 
-             'content': '回答格式：{"word": "字"} 只輸出JSON，不要其他文字'},
-        {'role': 'user',
-         'content': f'用家想寫哪一個詞語？用家說：{voice_text}'}
-    ])
-        reply = response['message']['content']
-        print(reply)
-
-        response = requests.post("http://127.0.0.1:8888/projector_on", json=json.loads(reply))
-
-        if response.status_code == 200:
-            print("done")
-            print(response.json())
-
-    else:
-        response = requests.get('http://127.0.0.1:3141/capture')
-        if response.status_code == 200:
-            print("picture will be taken")
-            print(response.json())
-
-        if voice_text is not None:
-            current_voice_text = voice_text 
-        else:
-            current_voice_text = "成句句子係咩意思"
-        
-        try:
-            cam_data = camera_queue.get(timeout=10)
-        except:
-            cam_data = "未檢測到詞語"
-        
-        explain_text(cam_data, current_voice_text)
-    '''
 
 def run_server():
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
@@ -371,6 +339,7 @@ print("FastAPI server starting at http://127.0.0.1:8000")
 
 server_thread = threading.Thread(target=run_server, daemon=True)
 server_thread.start()
+play_explain_audio("測試")
 
 while True:
     button_pressed.wait()
