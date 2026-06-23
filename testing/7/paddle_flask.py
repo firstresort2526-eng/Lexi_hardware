@@ -1,4 +1,5 @@
-# paddle_ocr_server.py
+# Server_url is 127.0.0.1/5000
+
 from flask import Flask, request, jsonify
 from paddleocr import PaddleOCR
 import base64
@@ -11,10 +12,13 @@ import time
 # Load model ONCE at startup (not per request)
 print("Loading PaddleOCR model...")
 start_time = time.time()
-ocr = PaddleOCR(lang='ch', use_textline_orientation=True, cpu_threads=4)
+ocr = PaddleOCR(
+    lang='ch', 
+    use_textline_orientation=False,
+    enable_mkldnn=True,
+    ocr_version='PP-OCRv4')
 print(f"Model loaded in {time.time() - start_time:.2f} seconds")
 
-# Your existing classes (unchanged)
 class Line():
     def __init__(self,point1=None,point2=None,slope=None,b=None):
         if isinstance(slope,(float,int)) and isinstance(b,(float,int)):
@@ -22,17 +26,13 @@ class Line():
             self.b = b
             return
         if hasattr(point1, '__len__') and hasattr(point2, '__len__'):
-            print(f"  Case 2: point1 type={type(point1)}, point2 type={type(point2)}")
             self.slope = (point2[1]-point1[1]) / (point2[0]-point1[0])
             self.b = point1[1] - self.slope*point1[0]
-            print(f"  Calculated: slope={self.slope}, type={type(self.slope)}, b={self.b}")
             return
         self.slope=None
         self.b=None
     def find_y(self,x):
-        print(self.slope, type(self.slope))
         if isinstance(self.slope,float):
-            print("find_y")
             return self.slope*x + self.b
 
 def calc_posits(poly, chars):
@@ -45,10 +45,8 @@ def calc_posits(poly, chars):
     top_char_width = (topright[0] - topleft[0]) / length
     bottom_char_width = (bottomright[0] - bottomleft[0]) / length
 
-    print(topleft,topright,bottomleft,bottomright, sep=",")
     top_horizontal_line = Line(point1=topleft, point2=topright)
     bottom_horizontal_line = Line(point1=bottomleft, point2=bottomright)
-    print(top_horizontal_line.find_y(344))
 
     bottom_points = []
     top_points = []
@@ -69,48 +67,68 @@ def calc_posits(poly, chars):
         ]
     return chars_posits
 
-def calc_distance(point1,point2=(350,350)):
-    return abs(point1[1]-point2[1])**2 + abs(point1[0]-point2[0])**2
+def calc_distance(point1, point2=None, image_size=None):
+    if point2 is None:
+        if image_size is None:
+            point2 = (350, 350)
+        else:
+            point2 = (image_size[0] / 2, image_size[1] / 2)
 
-def find_nearest_char(chars_posits):
-    print(chars_posits)
+    dx = point1[0] - point2[0]
+    dy = point1[1] - point2[1]
+    return dx * dx + 0.05 * dy * dy
+
+def find_nearest_char(chars_posits, image_size=None):
     distances = []
     for key,value in chars_posits.items():
         bottom_line = Line(point1=value[3],point2=value[2])
         middle_x = value[3][0] + (value[2][0] - value[3][0]) / 2
         middle_point = (middle_x,bottom_line.find_y(middle_x))
 
-        distance = (calc_distance(point1 = middle_point),key)
+        distance = (calc_distance(point1=middle_point, image_size=image_size), key)
         distances.append(distance)
 
     distances.sort()
     return distances
 
-def process_image(image_data):
+def process_image(image_data,image_size):
     """Process image and return just the words with their distances"""
     
     # Save temporarily (or you can work with PIL/CV2 directly)
-    temp_path = "/tmp/ocr_image.jpg"
-    image_data.save(temp_path)
+    #temp_path = "/tmp/ocr_image.jpg"
+    #image_data.save(temp_path)
     
     # Run OCR
-    prediction = ocr.predict(temp_path)[0]
+    prediction = ocr.predict(image_data)[0]
     
     # Extract just the words with their nearest char info
     results = []
     for i, (poly, text) in enumerate(zip(prediction['rec_polys'], prediction['rec_texts'])):
-        distances = find_nearest_char(calc_posits(poly, text))
-        
+        distances = find_nearest_char(calc_posits(poly, text), image_size=image_size)
+        second_exists = len(distances) > 1
         # Format: just the words with their closest character info
         words_info = {
             'line': i,
             'text': text,
             'closest_char': distances[0][1] if distances else None,
-            'second_closest': distances[1][1] if len(distances) > 1 else None
+            'second_closest': distances[1][1] if second_exists else None,
+            'closest_distance': distances[0][0] if distances else None,
+            'second_closest_distance': distances[1][0] if second_exists else None,
         }
         results.append(words_info)
     
-    return results
+    return results[find_nearest_index(results):]
+
+def find_nearest_index(words_list):
+    nearest = words_list[0]['closest_distance']
+    index = 0
+    while True:
+        if len(words_list) > index+1:
+            if words_list[index+1]["closest_distance"] > words_list[index]['closest_distance']:
+                return index
+        else:
+            return index 
+        index += 1
 
 # Create Flask app
 app = Flask(__name__)
@@ -129,12 +147,15 @@ def ocr_endpoint():
                 "line": 0,
                 "text": "recognised_text",
                 "closest_char": "nearest_text",
-                "second_closest": "2nd_nearest_text"
+                "second_closest": "2nd_nearest_text",
+                "closest_distance": float,
+                "second_closest_distance":float
             },
             ...
         ]
     }
     """
+    starttime = time.perf_counter()
     try:
         # Get JSON data
         data = request.get_json()
@@ -151,11 +172,19 @@ def ocr_endpoint():
         
         # Decode base64 to image
         image_bytes = base64.b64decode(image_base64)
-        image = Image.open(io.BytesIO(image_bytes))
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        cv2_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if cv2_img is None:
+            return jsonify({'error': 'Failed to decode image'}), 400
+            
+        # Get dimensions from the cv2 matrix (height, width)
+        h, w, _ = cv2_img.shape
+        image_size = (w, h)
         
         # Process the image
-        results = process_image(image)
-        
+        results = process_image(cv2_img, image_size)
+        endtime = time.perf_counter()
+        print(starttime-endtime)
         # Return just the words (you can customize what you need)
         return jsonify({
             'words': results
@@ -171,4 +200,4 @@ def health():
 
 if __name__ == '__main__':
     # Run the server
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)

@@ -41,7 +41,6 @@ picam2.start()
 print("14. Camera started")
 
 api_key = os.getenv('ROBOFLOW_API_KEY')
-print(api_key)
 print("15. Got API key")
 
 print("16. Defining run_sam_workflow function...")
@@ -62,9 +61,6 @@ def run_sam_workflow(image_path, api_key):
         }
     }
     print("  16.3 Payload created")
-    
-    import requests
-    print("  16.4 Imported requests")
     
     response = requests.post(
         "https://serverless.roboflow.com/caspar9872/workflows/sam3-with-prompts",
@@ -112,7 +108,7 @@ class HeatmapToCoords(layers.Layer):
         return config
 
 print("18. Loading model...")
-model = tf.keras.models.load_model("best_model4.keras")
+model = tf.keras.models.load_model("best_model4.keras",custom_objects={'HeatmapToCoords': HeatmapToCoords})
 print("19. Model loaded")
 
 print("22. Starting photo capture...")
@@ -227,17 +223,17 @@ with open('temp/cropped_88888.jpg','rb') as f:
     encoded_string = base64.b64encode(f.read()).decode('utf-8')
 
 payload = {"image":encoded_string}
-audie_url = "http://localhost:8000/explain"
 
 # Let's handle the respond (Rare time when i use try except)
 try:
     results = requests.post(url=server_url,json=payload)
     if results.status_code == 200:
         print("yay")
-        print(results.json())
+        result_json = results.json()
+        print(result_json)
         # Now I need to send a post request to audie's FastAPI server
-        # Output from her server is {"status": "processing", "text": text}
-        aud_result = requests.post(url=audie_url,json=results)
+        # Output from her server is {"status": "camera_data_received"}
+        aud_result = requests.post(url="http://0.0.0.0:8000/camera_data",json=results.json())
         print(aud_result.json())
     else:
         print(f"Error code: {results.status_code}")

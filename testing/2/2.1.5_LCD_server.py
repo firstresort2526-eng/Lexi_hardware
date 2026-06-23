@@ -3,12 +3,28 @@ import time, json
 import numpy as np
 from pathlib import Path
 import math
+from flask import Flask, request
 
 # Display size constants
+SI0 = 10   # GPIO 10 - Physical pin 19
+SI1 = 22    # GPIO 9  - Physical pin 21
+SI2 = 27   # GPIO 11 - Physical pin 23
+SI3 = 17    # GPIO 8  - Physical pin 24
+SCL = 11    # GPIO 7  - Physical pin 26
+CS0 = 5    # GPIO 5  - Physical pin 29
+RST = 25   # GPIO 25 - Physical pin 22
+BL = 16    # GPIO 16 - Physical pin 36
+
+LED_PIN = 26
 COL = 360
 ROW = 360
-cursor = []
+cursor = [160,160]
 font = {}
+
+def backlight(state):
+    ''' Control the backlight of the projector, True = open, False = turn off'''
+    GPIO_state = GPIO.HIGH if state else GPIO.LOW
+    GPIO.output(LED_PIN, GPIO_state)
 
 def add_trailing_zero(mat):
     if len(mat) == 40:
@@ -1243,6 +1259,67 @@ def DispBlock(data1,data2):
             write_lcd(data1)
             write_lcd(data2)
 
+app = Flask(__name__)
+written_word = ''
+
+@app.route("/projector_on",methods=['POST'])
+def project():
+    param = request.get_json()
+    word = param.get('word')
+    print(word)
+    dispWord(
+        word,
+        bg_color=(0x00,0x00),
+        font_color=(0xf8,0x00),
+        flip=True
+    )
+    backlight(True)
+    global written_word
+    written_word = word
+    return {'status':'success'}
+
+@app.route("/projector_light",methods=["POST"])
+def control():
+    params = request.get_json()
+    state = params.get('state')
+    backlight(state)
+    return {'status':'success'}
+
+@app.route("/projector_clear",methods=['GET'])
+def clear():
+    global written_word
+    backlight(False)
+    dispWord(
+        written_word,
+        bg_color=(0x00,0x00),
+        font_color=(0x00,0x00),
+        flip=False
+    )
+    written_word = ""
+    return {'status':'success'}
+
+@app.route("/fill-screen",methods=['POST'])
+def black():
+    params = request.get_json()
+    try:
+        color = params.get('color',(0x00,0x00))
+        DispColorQSPI(color[0],color[1])
+        return {'status':'success'}
+    except Exception as e:
+        return {'status':'error','error_message':e}
+    
+@app.route("/display_img", methods=['POST'])
+def show_img():
+    params = request.get_json()
+    mat = params.get('image',None)
+    if not mat:
+        return {"status":"error","error_message":f"Empty matrix. Detected matrix: {mat}"}
+    mat_size = mat.shape
+    if mat_size != (ROW,COL,2):
+        return {"status":"error","error_message":f"Wrong matrix size. Detected matrix size: {mat_size}"}
+    backlight(False)
+    DispPixels(mat)
+    backlight(True)
 
 # Test function
 def test_display():
@@ -1275,12 +1352,12 @@ def test_display():
     LCD_Init()
     print("init complete")
     global cursor
-    DispColorQSPI(0x00,0x00)
+    DispColorQSPI(0xe8,0x00)
     cursor = [160,160]
     
     dispWord(
-        "學習",
-        bg_color = (0x00,0x00), # Red
+        "你",
+        bg_color = (0xe8,0x00), # Red
         font_color = (0xff,0xe0), # Yellow
         flip = True
     )
@@ -1289,7 +1366,13 @@ def test_display():
 
 if __name__ == "__main__":
     try:
-        test_display()
+        GPIO.setmode(GPIO.BCM)
+        for pin in [SI0, SI1, SI2, SI3, SCL, CS0, RST, BL,LED_PIN]:
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, GPIO.LOW)
+        GPIO.output(BL, GPIO.HIGH)
+        LCD_Init()
+        app.run(debug=False, port=8888)
         GPIO.cleanup()
     except Exception as e:
         print(f"Error: {e}")
